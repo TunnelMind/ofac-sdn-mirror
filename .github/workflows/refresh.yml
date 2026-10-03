@@ -1,0 +1,23 @@
+# Daily mirror of OFAC's SDN.CSV. One squashed commit, force-pushed, so the repo stays one file large.
+name: refresh
+on:
+  schedule: [{ cron: "23 5 * * *" }]
+  workflow_dispatch:
+permissions: { contents: write }
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: fetch
+        run: |
+          curl -sSL -m 120 -A "tunnelmind-ofac-mirror/1.0 (+https://tunnelmind.ai)" -o SDN.CSV.new \
+            "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN.CSV"
+          # sanity: a real list is megabytes of quoted CSV; a WAF page or an error is not
+          test "$(stat -c %s SDN.CSV.new)" -gt 1000000 && head -c 200 SDN.CSV.new | grep -q '"'
+          if cmp -s SDN.CSV.new SDN.CSV; then echo "unchanged"; rm SDN.CSV.new; exit 0; fi
+          mv SDN.CSV.new SDN.CSV
+          sha256sum SDN.CSV > SDN.CSV.sha256
+          git config user.name "ofac-sdn-mirror"; git config user.email "ops@tunnelmind.ai"
+          git checkout --orphan fresh && git add -A && git commit -qm "SDN.CSV $(date -u +%F) $(cut -c1-12 SDN.CSV.sha256)"
+          git branch -M main && git push --force origin main
