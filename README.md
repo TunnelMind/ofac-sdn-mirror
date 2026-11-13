@@ -19,5 +19,5 @@ Refresh rule: when upstream sends identical bytes but a new `Last-Modified` or `
 `SDN.CSV.meta.json` is republished — `SDN.CSV` and its sha256 are untouched and the commit message says
 "bytes unchanged". A header missing from the response keeps its previous value in the meta file. Bad
 responses are never published: a non-200 final status, an empty body, a body under the size floor, a
-first line that is not CSV, or an HTML body is refused before any file changes. The meta file is always
+first line that is not CSV, or an HTML body is refused before any file changes. The meta file is written as
 valid JSON (the etag is escaped).
