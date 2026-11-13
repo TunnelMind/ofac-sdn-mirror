@@ -29,7 +29,9 @@ status=$(awk '/^HTTP\//{s=$2} END{gsub(/\r/,"",s); print s}' "$HEADERS")
 [ -s "$BODY" ] || reject "empty body"
 size=$(wc -c < "$BODY")
 [ "$size" -ge "${MIN_BYTES:-1000000}" ] || reject "body is $size bytes, under the ${MIN_BYTES:-1000000} floor"
-head -n1 "$BODY" | grep -q '^[0-9][0-9]*,"' || reject "line 1 is not a CSV row"
+# A UTF-8 BOM may precede line 1; it is ignored for the match only (the file is written byte-for-byte). printf octal: portable, unlike sed \xEF.
+bom=$(printf '\357\273\277')
+head -n1 "$BODY" | sed "1s/^$bom//" | grep -q '^[0-9][0-9]*,"' || reject "line 1 is not a CSV row"
 [ "$(head -c1024 "$BODY" | tr -d ' \t\r\n' | head -c1)" != '<' ] || reject "body looks like HTML"
 if head -c1024 "$BODY" | grep -qi '<html\|<!doctype'; then reject "body looks like HTML"; fi
 rm -f "$HEADERS"

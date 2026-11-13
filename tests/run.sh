@@ -38,6 +38,7 @@ run_case() {
   else echo "FAIL $name (word=$got changed=${changed# } json=$jsonok)"; rc=1; fi
 }
 
+run_case "BOM body" bom.csv bytes "yes yes yes"
 run_case "bytes changed" new.csv bytes "yes yes yes"
 run_case "all same" old.csv unchanged "no no no"
 run_case "ETag with quotes" new.csv bytes "yes yes yes" quoted-etag.headers '"81a3d1b64f269f171ec91f55c9bbe799"'
@@ -74,6 +75,7 @@ reject "302 then 404 chain" old.csv 302-404.headers
 reject "empty body" empty.csv new.headers
 reject "HTML body" page.html new.headers
 reject "HTML after a CSV-like line 1" csvlike.html new.headers "" "looks like HTML"
+reject "BOM then HTML" bom.html new.headers "" "line 1 is not a CSV row"
 reject "under size floor" tiny.csv new.headers
 reject "default floor rejects small body" old.csv new.headers default
 
