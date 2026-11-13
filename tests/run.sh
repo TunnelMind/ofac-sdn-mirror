@@ -83,6 +83,8 @@ reject "default floor rejects small body" old.csv new.headers default
 run_case "SC-004" old.csv meta "no no yes" sc004.headers "" "" "\"sha256\":\"$(sha256sum $FX/old.csv | cut -c1-8)"
 # SC-004 on the real mirror files (copied, never touched): legacy invalid meta + new Last-Modified.
 d=$T/sc004real; mkdir -p "$d/repo"; cp SDN.CSV SDN.CSV.sha256 SDN.CSV.meta.json "$d/repo/"
+# Pin the copy's published_at to an old value: after the first daily refresh the committed one equals the 09 Nov header below, which would make this case "unchanged".
+sed -i 's/"published_at":"[^"]*"/"published_at":"Thu, 01 Jan 1970 00:00:00 GMT"/' "$d/repo/SDN.CSV.meta.json"
 # ETag comes from the copied meta (same anchored sed as meta_get, then unescape), so the case never depends on the committed value.
 et=$(sed -n 's/.*"etag":"\(.*\)","fetched_at":.*/\1/p' "$d/repo/SDN.CSV.meta.json" | sed 's/\\"/"/g;s/\\\\/\\/g')
 cp SDN.CSV "$d/b"; sed -e "s/^Last-Modified:.*/Last-Modified: Mon, 09 Nov 2026 19:36:18 GMT\r/" -e "s|^ETag:.*|ETag: $et\r|" $FX/legacy.headers > "$d/h"
