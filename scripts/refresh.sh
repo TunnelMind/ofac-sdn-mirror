@@ -33,16 +33,18 @@ head -n1 "$BODY" | grep -q '^[0-9][0-9]*,"' || reject "line 1 is not a CSV row"
 [ "$(head -c1024 "$BODY" | tr -d ' \t\r\n' | head -c1)" != '<' ] || reject "body looks like HTML"
 if head -c1024 "$BODY" | grep -qi '<html\|<!doctype'; then reject "body looks like HTML"; fi
 rm -f "$HEADERS"
-if cmp -s "$BODY" "$DIR/SDN.CSV" && [ -s "$DIR/SDN.CSV.meta.json" ]; then
-  rm "$BODY"
-  # Same bytes: a republication that only moves Last-Modified/ETag rewrites the meta alone.
-  # A header missing from the response keeps its previous value.
-  M=$DIR/SDN.CSV.meta.json; moved=
+# A header missing from the response keeps its previous meta value, whether or not the bytes changed.
+M=$DIR/SDN.CSV.meta.json; moved=; oldp=; olde=
+if [ -s "$M" ]; then
   oldp=$(meta_get published_at etag "$M"); olde=$(meta_get etag fetched_at "$M")
   if [ -z "$published" ]; then echo "kept previous published_at: header missing" >&2; published=$oldp
   elif [ "$published" != "$oldp" ]; then moved=1; fi
   if [ -z "$etag" ]; then echo "kept previous etag: header missing" >&2; etag=$olde
   elif [ "$etag" != "$olde" ]; then moved=1; fi
+fi
+if cmp -s "$BODY" "$DIR/SDN.CSV" && [ -s "$M" ]; then
+  rm "$BODY"
+  # Same bytes: a republication that only moves Last-Modified/ETag rewrites the meta alone.
   [ -n "$moved" ] || { echo unchanged; exit 0; }
   # Never write an empty hash: if the .sha256 is missing, hash the (identical) CSV itself.
   sha=$(cut -c1-64 "$DIR/SDN.CSV.sha256" 2>/dev/null || true)

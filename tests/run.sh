@@ -9,7 +9,7 @@ T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 
 # case NAME BODYFIXTURE EXPECT_WORD EXPECT_CHANGED("yes"/"no" for CSV sha meta, e.g. "yes yes yes") [HEADERS [ETAG [LOGTEXT [METATEXT]]]]
 # The starting meta matches new.headers, so "all same" means every header equals the previous value.
-# LOGTEXT / METATEXT: substrings that must appear in the script output / the meta file.
+# LOGTEXT / METATEXT: substrings that must appear on the script's stderr / the meta file.
 # When meta is rewritten it must parse as JSON; with ETAG given, the parsed etag must equal it.
 run_case() {
   name=$1 body=$2 word=$3 want=$4 hdr=${5:-new.headers} etag=${6-} logt=${7-} metat=${8-}
@@ -20,7 +20,7 @@ run_case() {
     "$(cut -c1-64 "$d/repo/SDN.CSV.sha256")" > "$d/repo/SDN.CSV.meta.json"
   cp "$d/repo"/SDN.CSV* "$d/before/"
   cp "$FX/$hdr" "$d/h"; cp "$FX/$body" "$d/b"
-  out=$(sh scripts/refresh.sh "$d/h" "$d/b" "$d/repo" 2>&1)
+  out=$(sh scripts/refresh.sh "$d/h" "$d/b" "$d/repo" 2>"$d/err")
   got=$(printf '%s\n' "$out" | tail -n1)
   changed=
   for f in SDN.CSV SDN.CSV.sha256 SDN.CSV.meta.json; do
@@ -32,7 +32,7 @@ run_case() {
     if [ -n "$etag" ] && [ "$jsonok" = yes ]; then
       [ "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["etag"])' "$d/repo/SDN.CSV.meta.json")" = "$etag" ] || jsonok=no
     fi;; esac
-  [ -z "$logt" ] || case $out in *"$logt"*) ;; *) jsonok=no;; esac
+  [ -z "$logt" ] || grep -qF "$logt" "$d/err" || jsonok=no
   [ -z "$metat" ] || grep -qF "$metat" "$d/repo/SDN.CSV.meta.json" || jsonok=no
   if [ "$got" = "$word" ] && [ "${changed# }" = "$want" ] && [ $jsonok = yes ]; then echo "PASS $name"
   else echo "FAIL $name (word=$got changed=${changed# } json=$jsonok)"; rc=1; fi
@@ -48,6 +48,8 @@ run_case "missing Last-Modified" old.csv unchanged "no no no" no-lm.headers "" "
 run_case "missing Last-Modified, ETag changed" old.csv meta "no no yes" no-lm-etag-changed.headers '"def456"' "kept previous published_at: header missing" "Fri, 06 Nov 2026 14:00:00 GMT"
 run_case "missing ETag" old.csv unchanged "no no no" no-etag.headers "" "kept previous etag: header missing"
 run_case "missing ETag, Last-Modified changed" old.csv meta "no no yes" no-etag-lm-changed.headers '"abc123"' "kept previous etag: header missing" "Sat, 07 Nov 2026 10:00:00 GMT"
+run_case "bytes changed, missing Last-Modified" new.csv bytes "yes yes yes" no-lm-etag-changed.headers '"def456"' "kept previous published_at: header missing" "Fri, 06 Nov 2026 14:00:00 GMT"
+run_case "bytes changed, missing ETag" new.csv bytes "yes yes yes" no-etag-lm-changed.headers '"abc123"' "kept previous etag: header missing" "Sat, 07 Nov 2026 10:00:00 GMT"
 # reject NAME BODYFIXTURE HEADERS [MINBYTES|default] — the guard must exit non-zero, print no decision
 # word, change no repo file, and leave the body in place.
 reject() {
