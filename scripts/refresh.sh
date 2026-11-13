@@ -17,8 +17,8 @@ meta_get() {
 # Spec 090 (TunnelMind data-api): the PUBLICATION time is the object's Last-Modified (the final
 # response block's headers, after the redirect; a redirect's own headers never count); the consumer judges freshness on it, not on our
 # fetch time. Written as a sidecar next to the file, also when the file itself is unchanged.
-published=$(awk 'BEGIN{IGNORECASE=1} /^HTTP\//{v=""} /^last-modified:/{v=$0} END{sub(/^[^:]*: */,"",v); gsub(/\r/,"",v); print v}' "$HEADERS")
-etag=$(awk 'BEGIN{IGNORECASE=1} /^HTTP\//{v=""} /^etag:/{v=$0} END{sub(/^[^:]*: */,"",v); gsub(/\r/,"",v); print v}' "$HEADERS")
+published=$(awk '/^HTTP\//{v=""} tolower($0) ~ /^last-modified:/{v=$0} END{sub(/^[^:]*: */,"",v); gsub(/\r/,"",v); print v}' "$HEADERS")
+etag=$(awk '/^HTTP\//{v=""} tolower($0) ~ /^etag:/{v=$0} END{sub(/^[^:]*: */,"",v); gsub(/\r/,"",v); print v}' "$HEADERS")
 # Input guards (FR-003/004/011): refuse before any repo file or $BODY is touched. The old workflow
 # line never enforced its 1 MB floor, so a 404 page or empty body could have replaced the list.
 # MIN_BYTES is for tests only; the workflow leaves it unset.
