@@ -79,12 +79,13 @@ reject "default floor rejects small body" old.csv new.headers default
 run_case "SC-004" old.csv meta "no no yes" sc004.headers "" "" "\"sha256\":\"$(sha256sum $FX/old.csv | cut -c1-8)"
 # SC-004 on the real mirror files (copied, never touched): legacy invalid meta + new Last-Modified.
 d=$T/sc004real; mkdir -p "$d/repo"; cp SDN.CSV SDN.CSV.sha256 SDN.CSV.meta.json "$d/repo/"
-# legacy.headers matches the real meta (ETag included), so only Last-Modified differs.
-cp SDN.CSV "$d/b"; sed "s/^Last-Modified:.*/Last-Modified: Mon, 09 Nov 2026 19:36:18 GMT\r/" $FX/legacy.headers > "$d/h"
+# ETag comes from the copied meta (same anchored sed as meta_get, then unescape), so the case never depends on the committed value.
+et=$(sed -n 's/.*"etag":"\(.*\)","fetched_at":.*/\1/p' "$d/repo/SDN.CSV.meta.json" | sed 's/\\"/"/g;s/\\\\/\\/g')
+cp SDN.CSV "$d/b"; sed -e "s/^Last-Modified:.*/Last-Modified: Mon, 09 Nov 2026 19:36:18 GMT\r/" -e "s|^ETag:.*|ETag: $et\r|" $FX/legacy.headers > "$d/h"
 w=$(sh scripts/refresh.sh "$d/h" "$d/b" "$d/repo" 2>&1 | tail -n1)
 if [ "$w" = meta ] && cmp -s SDN.CSV "$d/repo/SDN.CSV" && cmp -s SDN.CSV.sha256 "$d/repo/SDN.CSV.sha256" \
   && python3 -m json.tool "$d/repo/SDN.CSV.meta.json" >/dev/null 2>&1 \
-  && [ "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["sha256"])' "$d/repo/SDN.CSV.meta.json")" = 7f43332dae0d1b78ce44c31692d87a3c66e4075bcd97e36d3f18585572ff55b8 ]; then echo "PASS SC-004 real SDN.CSV"
+  && [ "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["sha256"])' "$d/repo/SDN.CSV.meta.json")" = "$(cut -c1-64 SDN.CSV.sha256)" ]; then echo "PASS SC-004 real SDN.CSV"
 else echo "FAIL SC-004 real SDN.CSV (word=$w)"; rc=1; fi
 
 # Legacy invalid meta (unescaped quotes): the reader must see the same etag as the escaped form,
