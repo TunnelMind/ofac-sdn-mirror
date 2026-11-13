@@ -21,5 +21,11 @@ jobs:
           decision=$(printf '%s\n' "$out" | tail -n1)
           [ "$decision" = unchanged ] && exit 0
           git config user.name "ofac-sdn-mirror"; git config user.email "ops@tunnelmind.ai"
-          git checkout --orphan fresh && git add -A && git commit -qm "SDN.CSV $(date -u +%F) $(cut -c1-12 SDN.CSV.sha256)"
+          # bytes = new list; meta = same bytes, only Last-Modified/ETag moved (message says so)
+          case "$decision" in
+            bytes) msg="SDN.CSV $(date -u +%F) $(cut -c1-12 SDN.CSV.sha256)" ;;
+            meta) msg="SDN.CSV.meta.json $(date -u +%F) $(cut -c1-12 SDN.CSV.sha256) (bytes unchanged)" ;;
+            *) echo "unexpected decision: $decision" >&2; exit 1 ;;
+          esac
+          git checkout --orphan fresh && git add -A && git commit -qm "$msg"
           git branch -M main && git push --force origin main
