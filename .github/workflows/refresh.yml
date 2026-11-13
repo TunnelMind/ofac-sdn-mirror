@@ -15,17 +15,11 @@ jobs:
             "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN.CSV"
           # sanity: a real list is megabytes of quoted CSV; a WAF page or an error is not
           test "$(stat -c %s SDN.CSV.new)" -gt 1000000 && head -c 200 SDN.CSV.new | grep -q '"'
-          # Spec 090 (TunnelMind data-api): the PUBLICATION time is the object's Last-Modified (the last
-          # response's headers, after the redirect); the consumer judges freshness on it, not on our
-          # fetch time. Written as a sidecar next to the file, also when the file itself is unchanged.
-          published=$(awk 'BEGIN{IGNORECASE=1} /^last-modified:/{v=$0} END{sub(/^[^:]*: */,"",v); gsub(/\r/,"",v); print v}' headers.txt)
-          etag=$(awk 'BEGIN{IGNORECASE=1} /^etag:/{v=$0} END{sub(/^[^:]*: */,"",v); gsub(/\r/,"",v); print v}' headers.txt)
-          rm -f headers.txt
-          if cmp -s SDN.CSV.new SDN.CSV && [ -s SDN.CSV.meta.json ]; then echo "unchanged"; rm SDN.CSV.new; exit 0; fi
-          mv SDN.CSV.new SDN.CSV
-          sha256sum SDN.CSV > SDN.CSV.sha256
-          printf '{"published_at":"%s","etag":"%s","fetched_at":"%s","sha256":"%s"}\n' \
-            "$published" "$etag" "$(date -u +%FT%TZ)" "$(cut -c1-64 SDN.CSV.sha256)" > SDN.CSV.meta.json
+          # decide + write files live in scripts/refresh.sh (no git there); this step only pushes
+          # capture first so a failing script stops the step (a pipe would report tail's status)
+          out=$(sh scripts/refresh.sh headers.txt SDN.CSV.new) || exit 1
+          decision=$(printf '%s\n' "$out" | tail -n1)
+          [ "$decision" = unchanged ] && exit 0
           git config user.name "ofac-sdn-mirror"; git config user.email "ops@tunnelmind.ai"
           git checkout --orphan fresh && git add -A && git commit -qm "SDN.CSV $(date -u +%F) $(cut -c1-12 SDN.CSV.sha256)"
           git branch -M main && git push --force origin main
