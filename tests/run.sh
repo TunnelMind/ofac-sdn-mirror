@@ -66,6 +66,7 @@ reject() {
 }
 # Only the final block counts: 302 then 200 is accepted (curl -L on a redirect), 302 then 404 is not.
 run_case "302 then 200 chain" new.csv bytes "yes yes yes" 302-200.headers
+run_case "302 with Last-Modified/ETag then bare 200" old.csv unchanged "no no no" 302-lm-200-bare.headers "" "kept previous published_at: header missing"
 reject "non-200" old.csv 404.headers
 reject "302 then 404 chain" old.csv 302-404.headers
 reject "empty body" empty.csv new.headers

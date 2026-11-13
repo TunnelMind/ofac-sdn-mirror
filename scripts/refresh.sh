@@ -14,11 +14,11 @@ meta_get() {
   sed -n "s/.*\"$1\":\"\(.*\)\",\"$2\":.*/\1/p" "$3" | sed 's/\\\(["\\]\)/\1/g'
 }
 
-# Spec 090 (TunnelMind data-api): the PUBLICATION time is the object's Last-Modified (the last
-# response's headers, after the redirect); the consumer judges freshness on it, not on our
+# Spec 090 (TunnelMind data-api): the PUBLICATION time is the object's Last-Modified (the final
+# response block's headers, after the redirect; a redirect's own headers never count); the consumer judges freshness on it, not on our
 # fetch time. Written as a sidecar next to the file, also when the file itself is unchanged.
-published=$(awk 'BEGIN{IGNORECASE=1} /^last-modified:/{v=$0} END{sub(/^[^:]*: */,"",v); gsub(/\r/,"",v); print v}' "$HEADERS")
-etag=$(awk 'BEGIN{IGNORECASE=1} /^etag:/{v=$0} END{sub(/^[^:]*: */,"",v); gsub(/\r/,"",v); print v}' "$HEADERS")
+published=$(awk 'BEGIN{IGNORECASE=1} /^HTTP\//{v=""} /^last-modified:/{v=$0} END{sub(/^[^:]*: */,"",v); gsub(/\r/,"",v); print v}' "$HEADERS")
+etag=$(awk 'BEGIN{IGNORECASE=1} /^HTTP\//{v=""} /^etag:/{v=$0} END{sub(/^[^:]*: */,"",v); gsub(/\r/,"",v); print v}' "$HEADERS")
 # Input guards (FR-003/004/011): refuse before any repo file or $BODY is touched. The old workflow
 # line never enforced its 1 MB floor, so a 404 page or empty body could have replaced the list.
 # MIN_BYTES is for tests only; the workflow leaves it unset.
