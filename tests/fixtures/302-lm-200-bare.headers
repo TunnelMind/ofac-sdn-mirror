@@ -1,0 +1,8 @@
+HTTP/1.1 302 Found
+Location: https://example.invalid/x
+Last-Modified: Mon, 09 Nov 2026 19:36:18 GMT
+ETag: "zzz"
+
+HTTP/1.1 200 OK
+Content-Type: text/csv
+

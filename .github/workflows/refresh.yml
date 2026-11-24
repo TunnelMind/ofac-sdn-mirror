@@ -1,0 +1,29 @@
+# Daily mirror of OFAC's SDN.CSV. One squashed commit, force-pushed, so the repo stays one file large.
+name: refresh
+on:
+  schedule: [{ cron: "23 5 * * *" }]
+  workflow_dispatch:
+permissions: { contents: write }
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: fetch
+        run: |
+          curl -sSL -m 120 -D headers.txt -A "tunnelmind-ofac-mirror/1.0 (+https://tunnelmind.ai)" -o SDN.CSV.new \
+            "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN.CSV"
+          # decide + write files live in scripts/refresh.sh (no git there); this step only pushes
+          # capture first so a failing script stops the step (a pipe would report tail's status)
+          out=$(sh scripts/refresh.sh headers.txt SDN.CSV.new) || exit 1
+          decision=$(printf '%s\n' "$out" | tail -n1)
+          [ "$decision" = unchanged ] && exit 0
+          git config user.name "ofac-sdn-mirror"; git config user.email "ops@tunnelmind.ai"
+          # bytes = new list; meta = same bytes, only Last-Modified/ETag moved (message says so)
+          case "$decision" in
+            bytes) msg="SDN.CSV $(date -u +%F) $(cut -c1-12 SDN.CSV.sha256)" ;;
+            meta) msg="SDN.CSV.meta.json $(date -u +%F) $(cut -c1-12 SDN.CSV.sha256) (bytes unchanged)" ;;
+            *) echo "unexpected decision: $decision" >&2; exit 1 ;;
+          esac
+          git checkout --orphan fresh && git add -A && git commit -qm "$msg"
+          git branch -M main && git push --force origin main
